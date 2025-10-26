@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>5x5 Tic Tac Toe - First/Second Choice</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 40px;
+    background-color: #f0f0f0;
+  }
+  h1 { margin-bottom: 10px; }
+  #chooseTurn { margin-bottom: 20px; }
+  #board {
+    display: none; /* hidden until player chooses first/second */
+    grid-template-columns: repeat(5, 70px);
+    grid-template-rows: repeat(5, 70px);
+    gap: 5px;
+    margin-top: 20px;
+    display: grid;
+  }
+  .cell {
+    width: 70px;
+    height: 70px;
+    background-color: #fff;
+    border: 2px solid #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  .cell:hover { background-color: #ddd; }
+  .win { background-color: #b4f0b4; }
+  #message { margin-top: 20px; font-size: 22px; }
+  button { margin: 5px; padding: 10px 20px; font-size: 16px; }
+</style>
+</head>
+<body>
+<h1>5x5 Tic Tac Toe (4-in-a-row, Full Reset)</h1>
+
+<div id="chooseTurn">
+  <p>Do you want to play first or second?</p>
+  <button onclick="startGame('first')">First (X)</button>
+  <button onclick="startGame('second')">Second (O)</button>
+</div>
+
+<div id="board"></div>
+<div id="message"></div>
+<button onclick="resetGame()">Reset</button>
+
+<script>
+const SIZE = 5;
+const WIN = 4;
+const MAX_DEPTH = 3;
+let board = Array(SIZE).fill().map(()=>Array(SIZE).fill(''));
+let player = 'X';
+let ai = 'O';
+let currentTurn = 'player';
+let gameOver = false;
+
+const boardDiv = document.getElementById('board');
+const messageDiv = document.getElementById('message');
+const chooseDiv = document.getElementById('chooseTurn');
+
+function createBoard(){
+  boardDiv.innerHTML = '';
+  for(let i=0;i<SIZE;i++){
+    for(let j=0;j<SIZE;j++){
+      const cell=document.createElement('div');
+      cell.classList.add('cell');
+      cell.dataset.row=i;
+      cell.dataset.col=j;
+      cell.addEventListener('click', playerMove);
+      boardDiv.appendChild(cell);
+    }
+  }
+}
+
+function startGame(choice){
+  chooseDiv.style.display='none';
+  boardDiv.style.display='grid';
+  if(choice==='first'){
+    player='X'; ai='O'; currentTurn='player';
+  } else {
+    player='O'; ai='X'; currentTurn='ai';
+    setTimeout(aiTurn, 100);
+  }
+  createBoard();
+}
+
+function playerMove(e){
+  if(gameOver || currentTurn!=='player') return;
+  const row=parseInt(e.target.dataset.row);
+  const col=parseInt(e.target.dataset.col);
+  if(board[row][col]!=='') return;
+  board[row][col]=player;
+  updateBoard();
+  const winCells=checkWin(board,player);
+  if(winCells){ highlightWin(winCells); messageDiv.textContent="You win!"; gameOver=true; return; }
+  if(isBoardFull()) fullReset();
+  currentTurn='ai';
+  setTimeout(aiTurn,100);
+}
+
+function aiTurn(){
+  if(gameOver || currentTurn!=='ai') return;
+  const move=minimax(board,true,0,-Infinity,Infinity);
+  if(move.row!==undefined && move.col!==undefined){
+    board[move.row][move.col]=ai;
+    updateBoard();
+    const winCells=checkWin(board,ai);
+    if(winCells){ highlightWin(winCells); messageDiv.textContent="AI wins!"; gameOver=true; return; }
+    if(isBoardFull()) fullReset();
+  }
+  currentTurn='player';
+}
+
+function updateBoard(){
+  for(let i=0;i<SIZE;i++){
+    for(let j=0;j<SIZE;j++){
+      const cell=boardDiv.querySelector(`.cell[data-row="${i}"][data-col="${j}"]`);
+      cell.textContent=board[i][j];
+      cell.classList.remove('win');
+    }
+  }
+}
+
+function fullReset(){
+  board = Array(SIZE).fill().map(()=>Array(SIZE).fill(''));
+  updateBoard();
+  messageDiv.textContent = "Board reset!";
+}
+
+function checkWin(b,p){
+  // Returns array of winning cells if win, else false
+  for(let i=0;i<SIZE;i++)
+    for(let j=0;j<=SIZE-WIN;j++)
+      if(b[i].slice(j,j+WIN).every(c=>c===p)) return Array.from({length:WIN},(_,k)=>({row:i,col:j+k}));
+  for(let j=0;j<SIZE;j++)
+    for(let i=0;i<=SIZE-WIN;i++){
+      let cells=[]; for(let k=0;k<WIN;k++){ if(b[i+k][j]===p) cells.push({row:i+k,col:j}); } if(cells.length===WIN) return cells;
+    }
+  for(let i=0;i<=SIZE-WIN;i++)
+    for(let j=0;j<=SIZE-WIN;j++){
+      let cells=[]; for(let k=0;k<WIN;k++){ if(b[i+k][j+k]===p) cells.push({row:i+k,col:j+k}); } if(cells.length===WIN) return cells;
+    }
+  for(let i=0;i<=SIZE-WIN;i++)
+    for(let j=WIN-1;j<SIZE;j++){
+      let cells=[]; for(let k=0;k<WIN;k++){ if(b[i+k][j-k]===p) cells.push({row:i+k,col:j-k}); } if(cells.length===WIN) return cells;
+    }
+  return false;
+}
+
+function highlightWin(cells){
+  for(const c of cells){
+    const cell=boardDiv.querySelector(`.cell[data-row="${c.row}"][data-col="${c.col}"]`);
+    if(cell) cell.classList.add('win');
+  }
+}
+
+function isBoardFull(){ return board.flat().every(c=>c!==''); }
+
+function evaluateBoard(b){
+  let score=0; const lines=[];
+  for(let i=0;i<SIZE;i++) for(let j=0;j<=SIZE-WIN;j++) lines.push(b[i].slice(j,j+WIN));
+  for(let j=0;j<SIZE;j++) for(let i=0;i<=SIZE-WIN;i++){ let col=[]; for(let k=0;k<WIN;k++) col.push(b[i+k][j]); lines.push(col);}
+  for(let i=0;i<=SIZE-WIN;i++) for(let j=0;j<=SIZE-WIN;j++){ let diag=[]; for(let k=0;k<WIN;k++) diag.push(b[i+k][j+k]); lines.push(diag);}
+  for(let i=0;i<=SIZE-WIN;i++) for(let j=WIN-1;j<SIZE;j++){ let diag=[]; for(let k=0;k<WIN;k++) diag.push(b[i+k][j-k]); lines.push(diag);}
+  for(const line of lines){
+    const aiCount=line.filter(c=>c===ai).length;
+    const playerCount=line.filter(c=>c===player).length;
+    if(aiCount>0 && playerCount===0) score += aiCount===3?50:aiCount===2?10:1;
+    else if(playerCount>0 && aiCount===0) score -= playerCount===3?50:playerCount===2?10:1;
+  }
+  return score;
+}
+
+function minimax(b,isMaximizing,depth,alpha,beta){
+  if(checkWin(b,ai)) return {score:100-depth};
+  if(checkWin(b,player)) return {score:depth-100};
+  if(depth>=MAX_DEPTH || isBoardFull()) return {score:evaluateBoard(b)};
+
+  let bestMove={};
+  if(isMaximizing){
+    let maxEval=-Infinity;
+    for(let i=0;i<SIZE;i++){
+      for(let j=0;j<SIZE;j++){
+        if(b[i][j]===''){
+          b[i][j]=ai;
+          let evalScore=minimax(b,false,depth+1,alpha,beta).score;
+          b[i][j]='';
+          if(evalScore>maxEval){ maxEval=evalScore; bestMove={row:i,col:j,score:maxEval}; }
+          alpha=Math.max(alpha,evalScore);
+          if(beta<=alpha) break;
+        }
+      }
+    }
+    return bestMove;
+  } else{
+    let minEval=Infinity;
+    for(let i=0;i<SIZE;i++){
+      for(let j=0;j<SIZE;j++){
+        if(b[i][j]===''){
+          b[i][j]=player;
+          let evalScore=minimax(b,true,depth+1,alpha,beta).score;
+          b[i][j]='';
+          if(evalScore<minEval){ minEval=evalScore; bestMove={row:i,col:j,score:minEval}; }
+          beta=Math.min(beta,evalScore);
+          if(beta<=alpha) break;
+        }
+      }
+    }
+    return bestMove;
+  }
+}
+
+function resetGame(){
+  board = Array(SIZE).fill().map(()=>Array(SIZE).fill(''));
+  gameOver=false;
+  messageDiv.textContent='';
+  createBoard();
+  boardDiv.style.display='grid';
+  chooseDiv.style.display='block';
+}
+
+</script>
+</body>
+</html>
